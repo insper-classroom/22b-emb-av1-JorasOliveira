@@ -71,15 +71,6 @@
 #define TASK_MOTOR (4096 / sizeof(portSTACK_TYPE))
 #define TASK_MOTOR (tskIDLE_PRIORITY)
 
-
-//AFEC
-#define AFEC_POT AFEC0
-#define AFEC_POT_ID ID_AFEC0
-#define AFEC_POT_CHANNEL 0 // Canal do pino PD30
-
-#define TASK_ADC_STACK_SIZE (1024 * 10 / sizeof(portSTACK_TYPE))
-#define TASK_ADC_STACK_PRIORITY (tskIDLE_PRIORITY)
-
 extern void vApplicationStackOverflowHook(xTaskHandle *pxTask,  signed char *pcTaskName);
 extern void vApplicationIdleHook(void);
 extern void vApplicationTickHook(void);
@@ -133,9 +124,6 @@ void but_callback(void) {
 	xQueueSend(xQueueModo, (void *)&modo, 10);
 }
 
-
-
-
 /************************************************************************/
 /* TASKS                                                                */
 /************************************************************************/
@@ -151,12 +139,12 @@ static void task_modo(void *pvParameters) {
 	for (;;)  {
 		
 	/* verifica se chegou algum dado na queue, e espera por 0 ticks */
-    if (xQueueReceive(xQueueModo, &msg, (TickType_t) 0)) {
+    if (xQueueReceive(xQueueModo, &msg, 0)) {
       /* chegou novo valor, atualiza delay ! */
       /* aqui eu poderia verificar se msg faz sentido (se esta no range certo)
        */
       /* converte ms -> ticks */
-      modo = msg / portTICK_PERIOD_MS;
+      modo = msg; // portTICK_PERIOD_MS;
 		char text[5];
 		sprintf(text, "%d", modo);
 		gfx_mono_draw_string(text, 50,16, &sysfont);
@@ -196,10 +184,13 @@ static void task_motor(void *pvParameters) {
     //vTaskDelay(delayMs);
   }
 }
+
+
   
 /************************************************************************/
 /* funcoes                                                              */
 /************************************************************************/
+
 
 static void configure_console(void) {
 	const usart_serial_options_t uart_serial_options = {
@@ -224,9 +215,16 @@ static void BUT_init(void) {
 	/* conf botão como entrada */
 	pio_configure(BUT_PIO, PIO_INPUT, BUT_PIO_PIN_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	pio_set_debounce_filter(BUT_PIO, BUT_PIO_PIN_MASK, 60);
-	pio_enable_interrupt(BUT_PIO, BUT_PIO_PIN_MASK);
+	
+	// Configura interrupção no pino referente ao botao e associa
+	// função de callback caso uma interrupção for gerada
+	// a função de callback é a: but_callback()
 	pio_handler_set(BUT_PIO, BUT_PIO_ID, BUT_PIO_PIN_MASK, PIO_IT_FALL_EDGE , but_callback);
+	
+	// Ativa interrupção e limpa primeira IRQ gerada na ativacao	
+	pio_enable_interrupt(BUT_PIO, BUT_PIO_PIN_MASK);
 	pio_get_interrupt_status(BUT1_PIO);
+	
 	// Configura NVIC para receber interrupcoes do PIO do botao
 	// com prioridade 4 (quanto mais próximo de 0 maior)
 	NVIC_EnableIRQ(BUT1_PIO_ID);
@@ -301,17 +299,18 @@ int main(void) {
 	if (xTaskCreate(task_modo, "oled", TASK_OLED_STACK_SIZE, NULL, TASK_OLED_STACK_PRIORITY, NULL) != pdPASS) {
 		printf("Failed to create oled task\r\n");
 	}
-	if (xTaskCreate(task_motor, "oled", TASK_OLED_STACK_SIZE, NULL, TASK_OLED_STACK_PRIORITY, NULL) != pdPASS) {
+	if (xTaskCreate(task_motor, "help", TASK_OLED_STACK_SIZE, NULL, TASK_OLED_STACK_PRIORITY, NULL) != pdPASS) {
 		printf("Failed to create oled task\r\n");
 	}
 	xQueueModo = xQueueCreate(32, sizeof(uint32_t));
-	if (xQueueModo == NULL)
+	if (xQueueModo == NULL){
 	printf("falha em criar a queue xQueueADC \n");
-	
+	}
 	
 	 xSemaphoreBut = xSemaphoreCreateBinary();
-	 if (xSemaphoreBut == NULL)
+	 if (xSemaphoreBut == NULL){
 	 printf("falha em criar o semaforo \n");
+	 }
 
 
 	/* Start the scheduler. */
