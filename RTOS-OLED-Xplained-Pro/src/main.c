@@ -285,6 +285,7 @@ int main(void) {
 	sysclk_init();
 	board_init();
 	motor_init();
+	BUT_init();
 
 	/* Initialize the console uart */
 	configure_console();
@@ -296,21 +297,23 @@ int main(void) {
 	}
 	*/
 	
+	
+	xQueueModo = xQueueCreate(32, sizeof(uint32_t));
+	if (xQueueModo == NULL){
+		printf("falha em criar a queue xQueueADC \n");
+	}
+	
+	xSemaphoreBut = xSemaphoreCreateBinary();
+	if (xSemaphoreBut == NULL){
+		printf("falha em criar o semaforo \n");
+	}
+	
 	if (xTaskCreate(task_modo, "oled", TASK_OLED_STACK_SIZE, NULL, TASK_OLED_STACK_PRIORITY, NULL) != pdPASS) {
 		printf("Failed to create oled task\r\n");
 	}
 	if (xTaskCreate(task_motor, "help", TASK_OLED_STACK_SIZE, NULL, TASK_OLED_STACK_PRIORITY, NULL) != pdPASS) {
 		printf("Failed to create oled task\r\n");
 	}
-	xQueueModo = xQueueCreate(32, sizeof(uint32_t));
-	if (xQueueModo == NULL){
-	printf("falha em criar a queue xQueueADC \n");
-	}
-	
-	 xSemaphoreBut = xSemaphoreCreateBinary();
-	 if (xSemaphoreBut == NULL){
-	 printf("falha em criar o semaforo \n");
-	 }
 
 
 	/* Start the scheduler. */
